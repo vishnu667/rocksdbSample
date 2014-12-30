@@ -14,7 +14,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created by prashanth on 12/30/14.
+ * The given code block contains a simple counter using rocksdb's merge operator
+ 
+ the Counters Fails for the following Cases
+ 
+ $ ab -r -k -n 10000 -c 1000 http://localhost:9009/
+
+ $ curl http://localhost:9009/get                                                                                                                                                           
+
+ Current Count is 135 (Expected value is 10000)
+
+ $ curl http://localhost:9009/reset
+
+ Current Count is 0
+
+ $ ab -r -k -n 10000 -c 1000 http://localhost:9009/batchIncrement
+
+ $ curl http://localhost:9009/get
+
+ Current Count is 16 (Expected value is 10000)
+ 
  */
 public class RocksDBConnector {
     private static final Logger LOG = LoggerFactory.getLogger(RocksDBConnector.class);

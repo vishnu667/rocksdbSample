@@ -4,7 +4,6 @@ import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.restexpress.Request;
 import org.restexpress.Response;
 import org.restexpress.RestExpress;
-import org.restexpress.pipeline.SimpleConsoleLogMessageObserver;
 import org.rocksdb.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,27 +11,31 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The given code block contains a simple counter using rocksdb's merge operator
  
  the Counters Fails for the following Cases
  
- $ ab -r -k -n 10000 -c 1000 http://localhost:9009/
+ $ ab -r -k -n 10000 -c 1000 http://localhost:9009/increment
 
  $ curl http://localhost:9009/get                                                                                                                                                           
 
- Current Count is 135 (Expected value is 10000)
+ Current RocksDB Count is 137   (Expected value is 10000)
+ Current AtomicLong Count is 10000
 
  $ curl http://localhost:9009/reset
 
- Current Count is 0
+ Current RocksDB Count is 0
+ Current AtomicLong Count is 0
 
  $ ab -r -k -n 10000 -c 1000 http://localhost:9009/batchIncrement
 
  $ curl http://localhost:9009/get
 
- Current Count is 16 (Expected value is 10000)
+ Current RocksDB Count is 16   (Expected value is 10000)
+ Current AtomicLong Count is 10000
  
  */
 public class RocksDBConnector {
@@ -48,6 +51,8 @@ public class RocksDBConnector {
     private static final int DEFAULT_EXECUTOR_THREAD_POOL_SIZE = 2;
     private static final int SERVER_PORT = 9009;
     private final static RocksDBConnector instance = new RocksDBConnector();
+    private static AtomicLong simpleCounter = new AtomicLong();
+    private static AtomicLong batchCounter = new AtomicLong();
     public static void main(String[] args) {
         RestExpress server = null;
         try {
@@ -65,8 +70,7 @@ public class RocksDBConnector {
         RestExpress server = new RestExpress()
                 .setName(SERVICE_NAME)
                 .setBaseUrl("http://localhost:" + SERVER_PORT)
-                .setExecutorThreadCount(DEFAULT_EXECUTOR_THREAD_POOL_SIZE)
-                .addMessageObserver(new SimpleConsoleLogMessageObserver());
+                .setExecutorThreadCount(DEFAULT_EXECUTOR_THREAD_POOL_SIZE);
 
         server.uri("/increment",instance).action("incrementCounter", HttpMethod.GET).noSerialization();
         server.uri("/batchIncrement",instance).action("batchIncrementCounter", HttpMethod.GET).noSerialization();
@@ -100,6 +104,7 @@ public class RocksDBConnector {
     private  static void resetCounter(){
         try {
             db.put(colFamilyHandles.get(0), KEY, BYTES_0);
+            
         } catch (RocksDBException e) {
             LOG.debug(e.getMessage());
         }
@@ -107,6 +112,7 @@ public class RocksDBConnector {
     private  static void mergeOperaton(){
         try {
             db.merge(colFamilyHandles.get(0),KEY, BYTES_1);
+            simpleCounter.incrementAndGet();
         } catch (RocksDBException e) {
             LOG.debug(e.getMessage());
         }
@@ -117,6 +123,7 @@ public class RocksDBConnector {
         try {
             batch.merge(colFamilyHandles.get(0), KEY, BYTES_1);
             db.write(write_option,batch);
+            simpleCounter.incrementAndGet();
         }catch (Exception e){
             LOG.debug(e.getMessage());
         }
@@ -129,10 +136,11 @@ public class RocksDBConnector {
         mergeBatchOperation();
     }
     public void getCounterValue(Request request, Response response) {
-            response.setBody("Current Count is "+getCount());
+            response.setBody("Current RocksDB Count is "+getCount()+"\n"+"Current AtomicLong Count is "+simpleCounter.get());
     }
     public void resetCounterValue(Request request, Response response) {
+        simpleCounter.set(0L);
         resetCounter();
-        response.setBody("Current Count is "+getCount());
+        response.setBody("Current RocksDB Count is "+getCount()+"\n"+"Current AtomicLong Count is "+simpleCounter.get());
     }
 }

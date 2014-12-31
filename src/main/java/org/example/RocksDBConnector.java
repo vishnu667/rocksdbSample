@@ -14,7 +14,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * The given code block contains a simple counter using rocksdb's merge operator
+ * 
+ The given code block contains a simple counter using rocksdb's merge operator
  
  the Counters Fails for the following Cases
  

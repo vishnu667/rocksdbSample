@@ -45,8 +45,10 @@ public class RocksDBConnector {
     private static List<String> colFamily= new ArrayList<String>();
     private static List<ColumnFamilyHandle> colFamilyHandles= new ArrayList<ColumnFamilyHandle>();
     private final static byte[] KEY = "testKey".getBytes();
-    private final static byte[] BYTES_1 = util.toBytes(1L);
-    private final static byte[] BYTES_0 = util.toBytes(0L);
+    private final static byte[] BYTES_1 = util.longToByte(1L);
+    //private final static byte[] BYTES_1 = util.toBytes(1L);
+    private final static byte[] BYTES_0 = util.longToByte(0L);
+    //private final static byte[] BYTES_0 = util.toBytes(0L);
     private  RocksDBConnector(){}
     private static final String SERVICE_NAME = "Admin Service";
     private static final int DEFAULT_EXECUTOR_THREAD_POOL_SIZE = 2;
@@ -96,7 +98,7 @@ public class RocksDBConnector {
 
     private static Long getCount(){
         try {
-            return util.toLong(db.get(KEY));
+            return util.byteToLong(db.get(KEY));
         } catch (RocksDBException e) {
             LOG.debug(e.getMessage());
             return 0L;

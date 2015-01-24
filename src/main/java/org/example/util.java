@@ -1,9 +1,26 @@
 package org.example;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 /**
  * Created by vishnu on 31/12/14.
  */
 public class util {
+    public static byte[] longToByte(long value) {
+        ByteBuffer longBuffer = ByteBuffer.allocate(8)
+                .order(ByteOrder.nativeOrder());
+        longBuffer.clear();
+        longBuffer.putLong(value);
+        return longBuffer.array();
+    }
+    public static long byteToLong(byte[] data)
+    { ByteBuffer longBuffer = ByteBuffer.allocate(8)
+            .order(ByteOrder.nativeOrder());
+        longBuffer.put(data, 0, 8);
+        longBuffer.flip();
+        return longBuffer.getLong();
+    }
     public static long toLong(byte[] data) {
         if (data == null || data.length != 8) return 0x0;
         // ----------

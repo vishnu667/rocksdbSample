@@ -7,6 +7,10 @@ import org.restexpress.RestExpress;
 import org.rocksdb.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+/*
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+*/
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,9 +50,8 @@ public class RocksDBConnector {
     private static List<ColumnFamilyHandle> colFamilyHandles= new ArrayList<ColumnFamilyHandle>();
     private final static byte[] KEY = "testKey".getBytes();
     private final static byte[] BYTES_1 = util.longToByte(1L);
-    //private final static byte[] BYTES_1 = util.toBytes(1L);
     private final static byte[] BYTES_0 = util.longToByte(0L);
-    //private final static byte[] BYTES_0 = util.toBytes(0L);
+
     private  RocksDBConnector(){}
     private static final String SERVICE_NAME = "Admin Service";
     private static final int DEFAULT_EXECUTOR_THREAD_POOL_SIZE = 2;
@@ -63,8 +66,10 @@ public class RocksDBConnector {
             server = initializeServer(args);
             server.awaitShutdown();
         } catch (IOException e) {
+            System.out.print(e);
             LOG.info(e.getMessage());
         } catch (RocksDBException e) {
+            System.out.print(e);
             LOG.info(e.getMessage());
         }
     }
@@ -77,6 +82,7 @@ public class RocksDBConnector {
 
         server.uri("/increment",instance).action("incrementCounter", HttpMethod.GET).noSerialization();
         server.uri("/batchIncrement",instance).action("batchIncrementCounter", HttpMethod.GET).noSerialization();
+        server.uri("/incrementAtomic",instance).action("incrementAtomicLong", HttpMethod.GET).noSerialization();
         server.uri("/reset",instance).action("resetCounterValue", HttpMethod.GET).noSerialization();
         server.uri("/get",instance).action("getCounterValue", HttpMethod.GET).noSerialization();
         server.bind(SERVER_PORT);
@@ -84,6 +90,8 @@ public class RocksDBConnector {
     }
     private  static void initializeRocksDb() throws RocksDBException {
             colFamily.add("default");
+            colFamily.add("testing2");
+            colFamily.add("testing1");
             RocksDB.loadLibrary();
             Options options = new Options().setCreateIfMissing(true);
             options.setMergeOperatorName("uint64add");
@@ -109,29 +117,32 @@ public class RocksDBConnector {
             db.put(colFamilyHandles.get(0), KEY, BYTES_0);
             
         } catch (RocksDBException e) {
-            LOG.debug(e.getMessage());
+            //LOG.debug(e.getMessage());
         }
     }
     private  static void mergeOperaton(){
         try {
             db.merge(colFamilyHandles.get(0),KEY, BYTES_1);
-            simpleCounter.incrementAndGet();
+
         } catch (RocksDBException e) {
             LOG.debug(e.getMessage());
         }
     }
+
     private static void mergeBatchOperation(){
         WriteBatch batch = new WriteBatch();
         WriteOptions write_option = new WriteOptions();
         try {
             batch.merge(colFamilyHandles.get(0), KEY, BYTES_1);
             db.write(write_option,batch);
-            simpleCounter.incrementAndGet();
+
         }catch (Exception e){
             LOG.debug(e.getMessage());
         }
     }
-
+    public  void incrementAtomicLong(Request request,Response response){
+        simpleCounter.incrementAndGet();
+    }
     public void incrementCounter(Request request, Response response) {
         mergeOperaton();
     }

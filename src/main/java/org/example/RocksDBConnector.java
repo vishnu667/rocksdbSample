@@ -1,5 +1,7 @@
 package org.example;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.restexpress.Request;
 import org.restexpress.Response;
@@ -48,10 +50,11 @@ public class RocksDBConnector {
     private  static  RocksDB db;
     private static List<String> colFamily= new ArrayList<String>();
     private static List<ColumnFamilyHandle> colFamilyHandles= new ArrayList<ColumnFamilyHandle>();
-    private final static byte[] KEY = "testKey".getBytes();
+    private final static String KEY = "testKey";
+    private final static byte[] KEY_BYTES = KEY.getBytes();
     private final static byte[] BYTES_1 = util.longToByte(1L);
     private final static byte[] BYTES_0 = util.longToByte(0L);
-
+    private static final Cache<String,String> guavaCachedIndex = CacheBuilder.newBuilder().build();
     private  RocksDBConnector(){}
     private static final String SERVICE_NAME = "Admin Service";
     private static final int DEFAULT_EXECUTOR_THREAD_POOL_SIZE = 2;
@@ -81,7 +84,9 @@ public class RocksDBConnector {
                 .setExecutorThreadCount(DEFAULT_EXECUTOR_THREAD_POOL_SIZE);
 
         server.uri("/increment",instance).action("incrementCounter", HttpMethod.GET).noSerialization();
-        server.uri("/batchIncrement",instance).action("batchIncrementCounter", HttpMethod.GET).noSerialization();
+        server.uri("/incrementAtomic",instance).action("incrementAtomicLong", HttpMethod.GET).noSerialization();
+        server.uri("/simpleRead",instance).action("simpleReadRocksDb", HttpMethod.GET).noSerialization();
+        server.uri("/simpleReadGuava",instance).action("simpleReadGuava", HttpMethod.GET).noSerialization();
         server.uri("/incrementAtomic",instance).action("incrementAtomicLong", HttpMethod.GET).noSerialization();
         server.uri("/reset",instance).action("resetCounterValue", HttpMethod.GET).noSerialization();
         server.uri("/get",instance).action("getCounterValue", HttpMethod.GET).noSerialization();
@@ -102,11 +107,14 @@ public class RocksDBConnector {
             if (db == null) {
                 db = RocksDB.open(options, "/opt/rocksdb/data/testdata", colFamily, colFamilyHandles);
             }
+        
+        db.put(colFamilyHandles.get(1),KEY_BYTES,KEY_BYTES);
+        guavaCachedIndex.put(KEY,KEY);
     }
 
     private static Long getCount(){
         try {
-            return util.byteToLong(db.get(KEY));
+            return util.byteToLong(db.get(KEY_BYTES));
         } catch (RocksDBException e) {
             LOG.debug(e.getMessage());
             return 0L;
@@ -114,15 +122,27 @@ public class RocksDBConnector {
     }
     private  static void resetCounter(){
         try {
-            db.put(colFamilyHandles.get(0), KEY, BYTES_0);
+            db.put(colFamilyHandles.get(0), KEY_BYTES, BYTES_0);
             
         } catch (RocksDBException e) {
             //LOG.debug(e.getMessage());
         }
     }
+    private static String getFromRocks(){
+        String a ;
+        try {
+            a = new String(db.get(colFamilyHandles.get(1), KEY_BYTES));
+        } catch (RocksDBException e) {
+            a=null;
+        }
+        return a;
+    }
+    private static String getFromGuava(){
+        return guavaCachedIndex.getIfPresent(KEY);
+    }
     private  static void mergeOperaton(){
         try {
-            db.merge(colFamilyHandles.get(0),KEY, BYTES_1);
+            db.merge(colFamilyHandles.get(0), KEY_BYTES, BYTES_1);
 
         } catch (RocksDBException e) {
             LOG.debug(e.getMessage());
@@ -133,7 +153,7 @@ public class RocksDBConnector {
         WriteBatch batch = new WriteBatch();
         WriteOptions write_option = new WriteOptions();
         try {
-            batch.merge(colFamilyHandles.get(0), KEY, BYTES_1);
+            batch.merge(colFamilyHandles.get(0), KEY_BYTES, BYTES_1);
             db.write(write_option,batch);
 
         }catch (Exception e){
@@ -143,12 +163,21 @@ public class RocksDBConnector {
     public  void incrementAtomicLong(Request request,Response response){
         simpleCounter.incrementAndGet();
     }
+    public  void simpleReadGuava(Request request,Response response){
+        response.setBody(getFromGuava());
+    }
+    public  void simpleReadRocksDb(Request request,Response response){
+        response.setBody(getFromRocks());
+    }
+    
+    
     public void incrementCounter(Request request, Response response) {
         mergeOperaton();
     }
     public void batchIncrementCounter(Request request, Response response) {
         mergeBatchOperation();
     }
+    
     public void getCounterValue(Request request, Response response) {
             response.setBody("Current RocksDB Count is "+getCount()+"\n"+"Current AtomicLong Count is "+simpleCounter.get());
     }
